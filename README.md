@@ -86,18 +86,18 @@ per bot token.
 
 ## Using it with a team
 
-Two patterns, pick one:
+This project is set up for **individual bots** — each teammate runs their
+own instance, and nothing is shared:
 
-**A) Shared bot (one host machine)**
-One person hosts the bot; teammates' Telegram IDs go into
-`ALLOWED_TELEGRAM_IDS` (comma-separated). Everyone messages the same bot;
-each chat gets its own isolated workspace and session. Note: all agent turns
-run on the host's machine under the host's kimchi account (spend shows up
-under the `source:telegram-bot` tag).
+1. Each teammate creates their **own bot** via @BotFather (own token).
+2. Clones this repo to their own machine.
+3. Puts **only their own** Telegram user ID in `ALLOWED_TELEGRAM_IDS`.
+4. Runs it themselves — via `run.bat`, the auto-start task, or the
+   [Kimchi Studio tutorial](docs/studio-tutorial.md).
 
-**B) Everyone runs their own**
-Each teammate creates their own bot via @BotFather and runs their own
-instance (their machine, their kimchi account). Fully isolated.
+That gives every teammate a private bot on their own machine, under their own
+kimchi account: own spend (tagged `source:telegram-bot`), own workspaces,
+own conversation history, own secrets.
 
 ## Commands
 

@@ -96,9 +96,9 @@ Just ask the agent in the project's session — it has the context:
 
 ## Good to know
 
-- **Team patterns:** one shared bot (everyone's IDs in one allowlist; runs on
-  the host's machine and kimchi account) or each teammate runs their own
-  instance — see the README's "Using it with a team" section.
+- **Teams:** this project uses **individual bots** — each teammate runs their
+  own instance (own token, own allowlist entry, own machine and kimchi
+  account). Nothing is shared. See the README's "Using it with a team" section.
 - **Security:** the allowlist is the *only* access boundary — the agent behind
   the bot has real write access on the host machine. Only allowlist people
   you trust with that. (Details and tested caveats in the README.)
