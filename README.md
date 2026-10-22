@@ -1,18 +1,21 @@
-# Kimchi Telegram Bot
+# Kimchi Bot (Telegram & Signal)
 
-Chat with your local [kimchi](https://kimchi.dev) coding agent from Telegram.
+Chat with your local [kimchi](https://kimchi.dev) coding agent from Telegram
+or Signal.
 Every text message you send is run as a full agent turn — **including file
 write access**, so you can ask it to create docs, notes, code, anything — and
 the reply comes back in the chat. Conversation context persists per chat, and
-files the agent creates land in a per-chat workspace on your machine.
+files the agent creates land in a per-chat workspace on your machine. The
+same bridge powers both frontends: `bot.py` (Telegram) and `signal_bot.py`
+(Signal).
 
 ```
-Telegram app ⇄ this bot (bot.py) ⇄ kimchi CLI (non-interactive, -p) ⇄ files in workspace/
+Telegram / Signal ⇄ bot.py / signal_bot.py ⇄ kimchi CLI (non-interactive, -p) ⇄ files in workspace/
 ```
 
 ## Features
 
-- 💬 **Full agent turns from Telegram** — prompts run on your local kimchi CLI
+- 💬 **Full agent turns from Telegram or Signal** — prompts run on your local kimchi CLI
 - 📝 **Write access** — the agent can create and edit files (docs, code, …)
 - 🧠 **Persistent context** — each chat has its own kimchi session, resumed
   automatically (and survives bot restarts via `bridge_state.json`)
@@ -25,11 +28,15 @@ Telegram app ⇄ this bot (bot.py) ⇄ kimchi CLI (non-interactive, -p) ⇄ file
 
 ## Requirements
 
-- **Windows** (developed and tested on Windows 11; the kimchi.js path
-  auto-detection targets npm-on-Windows — set `KIMCHI_JS` for other layouts)
-- **Python 3.10+** (verified on 3.14) with the `py` launcher
+- **Windows, macOS, or Linux** — developed and fully tested on Windows 11;
+  on macOS/Linux the kimchi.js entry point is auto-detected from your PATH
+  (or set `KIMCHI_JS`). Session-directory naming was verified on Windows
+  only — if context doesn't persist on your platform, please open an issue.
+- **Python 3.11+** (verified on 3.14)
 - **kimchi CLI** installed and logged in (`kimchi setup`) — verified with 1.16.1
-- A **Telegram bot token** (2 minutes, see below)
+- A **Telegram bot token** (2 minutes, see below) — or, for the Signal
+  frontend, [Docker](https://www.docker.com/) plus a Signal account
+  (see [docs/signal-setup.md](docs/signal-setup.md))
 
 ## Quick start
 
@@ -49,16 +56,26 @@ Telegram app ⇄ this bot (bot.py) ⇄ kimchi CLI (non-interactive, -p) ⇄ file
    ```
 
 4. **Run**
-   Double-click `run.bat` (creates a venv and installs dependencies on first run),
-   or manually:
-   ```powershell
-   py -m venv .venv
-   .venv\Scripts\python -m pip install -r requirements.txt
-   .venv\Scripts\python bot.py
-   ```
+   - **Windows:** double-click `run.bat` (creates a venv and installs
+     dependencies on first run), or manually:
+     ```powershell
+     py -m venv .venv
+     .venv\Scripts\python -m pip install -r requirements.txt
+     .venv\Scripts\python bot.py
+     ```
+   - **macOS/Linux:** `./run.sh` (creates the venv and installs dependencies
+     on first run), or manually:
+     ```bash
+     python3 -m venv .venv
+     .venv/bin/python -m pip install -r requirements.txt
+     .venv/bin/python bot.py
+     ```
 
 5. Open your bot in Telegram and send it a task, e.g.
    *"Create a file called ideas.md with a brainstorm of 10 blog post ideas about home espresso."*
+
+6. **Prefer Signal?** Follow [docs/signal-setup.md](docs/signal-setup.md), then
+   run `run-signal.bat` (Windows) or `./run.sh signal_bot.py` (macOS/Linux).
 
 > **Prefer a guided setup?** [docs/studio-tutorial.md](docs/studio-tutorial.md) shows
 > how to hand the entire deployment to a Kimchi Studio agent — including a
@@ -83,6 +100,21 @@ Manage it: `Start-ScheduledTask KimchiTelegramBot` · `Stop-ScheduledTask Kimchi
 · `Unregister-ScheduledTask KimchiTelegramBot` (remove). Don't run `run.bat`
 while the task instance is already running — Telegram allows only one poller
 per bot token.
+
+On **macOS/Linux**, use a launchd agent or a systemd user unit pointing at
+`.venv/bin/python bot.py` — or simply ask your Kimchi agent to set it up.
+
+## Signal frontend
+
+The same bridge powers a Signal bot (`signal_bot.py`), built on
+[signalbot](https://github.com/signalbot-org/signalbot) +
+[signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) (Docker).
+You link your Signal account by scanning a QR code — no bot token needed —
+and allowlist sender phone numbers. While the agent works, the chat shows a
+typing indicator; replies arrive as messages (long outputs are attached as
+files).
+
+Full setup walkthrough: [docs/signal-setup.md](docs/signal-setup.md)
 
 ## Using it with a team
 
@@ -141,10 +173,15 @@ own conversation history, own secrets.
   sessions; permission allow rules; timeout and cancel handling.
 - `bot.py` — Telegram layer (python-telegram-bot 22.x): allowlist gate, handlers,
   chunked replies, rotating file log.
+- `signal_bot.py` — Signal layer (signalbot 2.x): sender-number allowlist
+  enforced at handler registration, typing indicator while the agent works,
+  chunked replies, attachments for long outputs. Requires signal-cli-rest-api
+  (see [docs/signal-setup.md](docs/signal-setup.md)).
 - `test_bridge.py` — end-to-end test that runs two real kimchi turns (file
   creation, session adoption, cross-run context recall, reset):
   ```powershell
-  py -3 test_bridge.py
+  py -3 test_bridge.py        # Windows
+  python3 test_bridge.py     # macOS/Linux
   ```
 
 ## Limitations / roadmap

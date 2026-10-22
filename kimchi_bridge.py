@@ -1,4 +1,4 @@
-"""Async bridge from Telegram chats to the kimchi coding agent.
+"""Async bridge from chat frontends (Telegram, Signal) to the kimchi coding agent.
 
 Spawns the kimchi CLI non-interactively (``-p``) per chat turn:
 
@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,11 +31,34 @@ DEFAULT_MODEL = "glm-5.3"
 DEFAULT_ALLOW_TOOLS = ("read", "write", "edit", "ls", "find", "grep")
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_KIMCHI_JS = (
+# Default install location of the kimchi CLI entry point (npm on Windows).
+_KIMCHI_JS_WINDOWS = (
     Path.home() / "AppData" / "Roaming" / "npm" / "node_modules"
     / "@getkimchi" / "kimchi" / "bin" / "kimchi.js"
 )
 SESSIONS_ROOT = Path.home() / ".config" / "kimchi" / "harness" / "sessions"
+
+
+def resolve_kimchi_js() -> Path | None:
+    """Locate the kimchi CLI entry point across platforms.
+
+    Resolution order:
+    1. The Windows npm global install location.
+    2. ``kimchi`` on PATH — on macOS/Linux npm installs a symlink whose
+       realpath is the kimchi.js entry point. (On Windows the PATH entry is
+       a .cmd shim that node cannot execute directly, so it is skipped.)
+    """
+    if _KIMCHI_JS_WINDOWS.is_file():
+        return _KIMCHI_JS_WINDOWS
+    on_path = shutil.which("kimchi")
+    if on_path:
+        try:
+            resolved = Path(os.path.realpath(on_path))
+        except OSError:
+            return None
+        if resolved.is_file() and resolved.suffix == ".js":
+            return resolved
+    return None
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -80,12 +104,12 @@ class KimchiBridge:
         mcp_config: Path | str | None = None,
         state_file: Path | str | None = None,
     ) -> None:
-        self.kimchi_js = Path(kimchi_js) if kimchi_js else DEFAULT_KIMCHI_JS
-        if not self.kimchi_js.is_file():
+        self.kimchi_js = Path(kimchi_js) if kimchi_js else resolve_kimchi_js()
+        if self.kimchi_js is None or not self.kimchi_js.is_file():
             raise FileNotFoundError(
-                f"kimchi CLI entry point not found at {self.kimchi_js}. "
-                "Set KIMCHI_JS to the full path of kimchi.js "
-                "(npm global: ...\\npm\\node_modules\\@getkimchi\\kimchi\\bin\\kimchi.js)."
+                "Could not locate the kimchi CLI entry point (kimchi.js). "
+                "Set KIMCHI_JS to its full path — find it with `npm root -g` "
+                "and look under @getkimchi/kimchi/bin/kimchi.js."
             )
         self.workspace_root = (
             Path(workspace_root).resolve() if workspace_root else BASE_DIR / "workspace"
@@ -102,33 +126,33 @@ class KimchiBridge:
             self.mcp_config = Path(mcp_config)
 
         self.state_file = Path(state_file) if state_file else BASE_DIR / "bridge_state.json"
-        self._locks: dict[int, asyncio.Lock] = {}
-        self._procs: dict[int, asyncio.subprocess.Process] = {}
-        self._sessions: dict[int, str] = {}
+        self._locks: dict[int | str, asyncio.Lock] = {}
+        self._procs: dict[int | str, asyncio.subprocess.Process] = {}
+        self._sessions: dict[int | str, str] = {}
         self._load_state()
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def chat_workspace(self, chat_id: int) -> Path:
+    def chat_workspace(self, chat_id: int | str) -> Path:
         ws = self.workspace_root / str(chat_id)
         ws.mkdir(parents=True, exist_ok=True)
         return ws
 
-    def is_busy(self, chat_id: int) -> bool:
+    def is_busy(self, chat_id: int | str) -> bool:
         lock = self._locks.get(chat_id)
         return bool(lock and lock.locked())
 
-    def new_session(self, chat_id: int) -> None:
+    def new_session(self, chat_id: int | str) -> None:
         """Drop the stored session so the next message starts fresh context."""
         self._sessions.pop(chat_id, None)
         self._save_state()
 
-    def current_session(self, chat_id: int) -> str | None:
+    def current_session(self, chat_id: int | str) -> str | None:
         return self._sessions.get(chat_id)
 
-    def describe(self, chat_id: int) -> dict[str, object]:
+    def describe(self, chat_id: int | str) -> dict[str, object]:
         return {
             "model": self.model,
             "workspace": str(self.chat_workspace(chat_id)),
@@ -138,7 +162,7 @@ class KimchiBridge:
             "timeout_s": self.timeout_s,
         }
 
-    def list_workspace_files(self, chat_id: int) -> list[tuple[str, int]]:
+    def list_workspace_files(self, chat_id: int | str) -> list[tuple[str, int]]:
         ws = self.chat_workspace(chat_id)
         out: list[tuple[str, int]] = []
         for p in sorted(ws.rglob("*")):
@@ -146,7 +170,7 @@ class KimchiBridge:
                 out.append((str(p.relative_to(ws)), p.stat().st_size))
         return out
 
-    async def cancel(self, chat_id: int) -> bool:
+    async def cancel(self, chat_id: int | str) -> bool:
         """Kill the running process for this chat, if any."""
         proc = self._procs.get(chat_id)
         if proc is None or proc.returncode is not None:
@@ -157,7 +181,7 @@ class KimchiBridge:
             return False
         return True
 
-    async def run_prompt(self, chat_id: int, text: str) -> RunResult:
+    async def run_prompt(self, chat_id: int | str, text: str) -> RunResult:
         lock = self._locks.setdefault(chat_id, asyncio.Lock())
         if lock.locked():
             raise ChatBusyError(f"a run is already in progress for chat {chat_id}")
@@ -168,7 +192,7 @@ class KimchiBridge:
     # Internals
     # ------------------------------------------------------------------
 
-    async def _run_locked(self, chat_id: int, text: str) -> RunResult:
+    async def _run_locked(self, chat_id: int | str, text: str) -> RunResult:
         ws = self.chat_workspace(chat_id)
         started = time.monotonic()
         wall_start = time.time()

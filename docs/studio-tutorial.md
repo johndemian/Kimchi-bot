@@ -38,15 +38,20 @@ Open Kimchi Studio, start a **new chat**, and paste this prompt:
 ```text
 Set up the Kimchi-bot Telegram bridge on this machine:
 
-1. Clone https://github.com/johndemian/Kimchi-bot and work inside that folder.
-2. Ask me for the TELEGRAM_BOT_TOKEN and my Telegram user ID, then create a
+1. Detect the platform (Windows, macOS, or Linux) and adapt every command
+   accordingly (py/python3, run.bat/run.sh, Scheduled Task/launchd).
+2. Clone https://github.com/johndemian/Kimchi-bot and work inside that folder.
+3. Ask me for the TELEGRAM_BOT_TOKEN and my Telegram user ID, then create a
    .env file (based on .env.example) with those values.
-3. Create a Python virtual environment (.venv) and install requirements.txt.
-4. Run: py -3 test_bridge.py — it runs two real agent turns and verifies
-   file writing, sessions, and context. Fix anything that fails.
-5. Start the bot in the background and confirm from bot.log that it says
+4. Create a Python virtual environment (.venv) and install requirements.txt.
+5. If the kimchi CLI entry point is not auto-detected, locate it with
+   `npm root -g` (then @getkimchi/kimchi/bin/kimchi.js) and set KIMCHI_JS
+   in the .env.
+6. Run test_bridge.py — it runs two real agent turns and verifies file
+   writing, sessions, and context. Fix anything that fails.
+7. Start the bot in the background and confirm from bot.log that it says
    "Application started".
-6. Report the bot's @username and tell me it's ready to test.
+8. Report the bot's @username and tell me it's ready to test.
 ```
 
 The agent will run commands in its terminal panel — cloning, venv creation,
@@ -99,6 +104,9 @@ Just ask the agent in the project's session — it has the context:
 - **Teams:** this project uses **individual bots** — each teammate runs their
   own instance (own token, own allowlist entry, own machine and kimchi
   account). Nothing is shared. See the README's "Using it with a team" section.
+- **Signal instead of Telegram?** See [signal-setup.md](signal-setup.md) —
+  the Studio agent can set up the Docker-based signal-cli-rest-api too, then
+  run signal_bot.py the same way.
 - **Security:** the allowlist is the *only* access boundary — the agent behind
   the bot has real write access on the host machine. Only allowlist people
   you trust with that. (Details and tested caveats in the README.)

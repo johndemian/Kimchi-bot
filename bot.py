@@ -34,6 +34,7 @@ from telegram.ext import (
     filters,
 )
 
+from envutil import load_dotenv
 from kimchi_bridge import (
     DEFAULT_ALLOW_TOOLS,
     DEFAULT_MODEL,
@@ -70,21 +71,6 @@ Notes:
 
 class ConfigError(RuntimeError):
     pass
-
-
-def _load_dotenv(path: Path) -> None:
-    """Minimal zero-dependency .env loader (does not override real env)."""
-    if not path.is_file():
-        return
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
 
 
 @dataclass(frozen=True)
@@ -380,7 +366,7 @@ def main() -> None:
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
         handlers=handlers,
     )
-    _load_dotenv(BASE_DIR / ".env")
+    load_dotenv(BASE_DIR / ".env")
 
     try:
         CFG = Config.from_env()
