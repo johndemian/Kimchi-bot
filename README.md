@@ -60,6 +60,10 @@ Telegram app ⇄ this bot (bot.py) ⇄ kimchi CLI (non-interactive, -p) ⇄ file
 5. Open your bot in Telegram and send it a task, e.g.
    *"Create a file called ideas.md with a brainstorm of 10 blog post ideas about home espresso."*
 
+> **Prefer a guided setup?** [docs/studio-tutorial.md](docs/studio-tutorial.md) shows
+> how to hand the entire deployment to a Kimchi Studio agent — including a
+> copy-paste prompt that does everything except the BotFather steps.
+
 ### Auto-start on Windows
 
 A Scheduled Task named `KimchiTelegramBot` can start the bot automatically when
