@@ -1,0 +1,13 @@
+# Secrets & local config — never commit
+.env
+
+# Runtime state
+bot.log*
+bridge_state.json
+test_bridge_state.json
+workspace/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
